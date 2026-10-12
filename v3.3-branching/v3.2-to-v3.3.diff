@@ -1,0 +1,385 @@
+--- "/tmp/claude-0/-home-user-New/bb036fcd-30fb-5927-8dc4-ffac7642aea3/scratchpad/upload/The Boys - Rise of a Supe v3.2 (2026-10-12)/7 Script - Library.js"	2026-10-12 14:30:47.000000000 +0000
++++ "/home/user/New/v3.3-branching/7 Script - Library v3.3.js"	2026-10-12 15:38:21.536449689 +0000
+@@ -90,6 +90,15 @@
+      ON the day of a big canon event. A story from v3.1 is set to the
+      middle of its month until a real day turns up.
+ 
++   - v3.3: branching canon (sandbox). Canon is the default future, not a
++     promise: when the story kills someone early or saves someone canon
++     kills, every canon event, agenda line, news clause and card line that
++     depends on them is dropped, its day stops being a skip stop, and the
++     AI is told what changed instead. Everything the player never touched
++     still happens on schedule. /canon strict restores the old behavior.
++     Also: a reply's canon words can no longer move the date past the next
++     canon stop ("A-Train killed Robin Ward" no longer jumps to 2026).
++
+    COMMANDS (type one as a Story action, nothing else on the line; none are
+    needed to play, the script keeps track by itself)
+    /date              shows the date ("It's Tuesday, June 4, 2019.") and
+@@ -111,6 +120,8 @@
+    /dead Butcher      only if the script missed it: marks someone dead now
+    /alive Robin       only if the script missed it: marks someone alive
+    /news              lists the public canon news of the past year
++   /canon             shows the canon mode; /canon branch or /canon strict
++                      sets it for this adventure (see v3.3 above)
+    /private off       removes Jack's private adult details from the note in
+                       THIS adventure (/private on restores them); the AI gets
+                       them only once he is 18, never before
+@@ -118,7 +129,7 @@
+    [Tracker] lines are hidden from the AI, so just keep playing after it.
+    ===================================================================== */
+ 
+-const TRACKER_VERSION = "3.2";
++const TRACKER_VERSION = "3.3";
+ const TRACKER_CONFIG = {
+   start: { year: 2004, month: 10 },   // story starts October 2004
+   birth: { year: 1999, month: 9 },    // Jack was born September 1999
+@@ -130,7 +141,8 @@
+   cardHistory: true,                  // story cards show their canon history up to the story's month (Lite: false)
+   maxFacts: 12,                       // how many /fact lines the note carries
+   maxFactChars: 240,                  // longest single /fact
+-  maxChanges: 40                      // how many story changes (deaths, survivals, memberships) the script keeps
++  maxChanges: 40,                     // how many story changes (deaths, survivals, memberships) the script keeps
++  canonMode: "branch"                 // "branch": the story's changes branch the world (v3.3); "strict": canon happens on its day regardless
+ };
+ 
+ function Tracker(hook, text) {
+@@ -533,7 +545,8 @@
+   const rosterFor = (n) => at(ROSTERS, n);
+ 
+   // Canon, day by day: [date, "p" planned or "s" sudden, groups involved, what happens (the whole truth, secrets included),
+-  // a short line for later lists ("" = none)]. From the episodes; days the shows don't pin down are best estimates.
++  // a short line for later lists ("" = none), and optionally what it depends on that its text doesn't name ("!Name": that
++  // person's canon death; "Name": that person alive), for branch mode]. From the episodes; days the shows don't pin down are best estimates.
+   const CANON = [
+     ["2005-03-15", "p", "Vought,GodU", "Secret: Marie Moreau is born to Jackie and Malcolm Moreau through Project Odessa, Vought's covert program at Godolkin's fertility clinic that doses embryos with Compound V. She shows no powers and is written off as a failure.", ""],
+     ["2005-07-01", "p", "Vought,GodU", "Secret: Stan Edgar shuts down Project Odessa after its last child, Marie Moreau, shows no powers. Of all its children only she and Homelander survive.", ""],
+@@ -624,7 +637,7 @@
+     ["2019-06-24", "s", "Seven,Boys,Vought", "Homelander brings Butcher to the suburban home where Becca, hidden by Vought for eight years, is raising Homelander's son Ryan. Told Homelander is his father, Ryan's eyes glow red.", "Homelander found Becca Butcher alive, raising his son Ryan"],
+     ["2019-06-24", "s", "Boys,Gov", "Butcher wakes on a roadside by a restaurant, jots what he recalls of Becca's house on a placemat ('yellow ranch', 'big pines'), and sees on TV he's wanted nationwide for Stillwell's murder.", "the FBI launched a nationwide manhunt for Billy Butcher"],
+     ["2019-06-25", "s", "Boys", "On the run, Butcher drives to his old Royal Marines comrade Jock for help finding Becca; Jock tips off the authorities, and Butcher kills him and burns the body.", ""],
+-    ["2019-07-01", "p", "Vought,Seven", "Vought names Ashley Barrett Senior VP of Hero Management in Stillwell's place; Stan Edgar now handles the Seven and Homelander himself, and Homelander ignores her.", "Vought named Ashley Barrett SVP of Hero Management"],
++    ["2019-07-01", "p", "Vought,Seven", "Vought names Ashley Barrett Senior VP of Hero Management in Stillwell's place; Stan Edgar now handles the Seven and Homelander himself, and Homelander ignores her.", "Vought named Ashley Barrett SVP of Hero Management", "!Madelyn Stillwell"],
+     ["2019-07-01", "p", "Vought", "Stillwell's baby son Teddy, a teleporter, is placed at Vought's Red River Institute.", ""],
+     ["2020-09-30", "p", "Vought,Seven", "At Translucent's public funeral Vought announces his death; Homelander blames a Supe-terrorist called El Diablo and vows revenge, and Starlight sings a tribute. Secret: Hughie Campbell killed him in May 2019.", "Vought held Translucent's funeral, blaming Supe-terrorist El Diablo"],
+     ["2020-09-30", "p", "Seven,Vought", "Stormfront, picked by Stan Edgar without asking Homelander, announces on a livestream that she joins the Seven; Homelander confronts Edgar. Secret: she is Klara Risinger, born 1919, a Nazi and Frederick Vought's wife.", "Stormfront joined the Seven"],
+@@ -674,7 +687,7 @@
+     ["2020-10-15", "s", "Seven,Boys", "Stormfront wrecks their car, fights off Maeve, Starlight and Kimiko and chokes Becca; Ryan's heat vision maims her and kills Becca. Maeve's Flight 37 footage stops Homelander, who killed Vought's retrieval team; Butcher leaves with Ryan.", ""],
+     ["2020-10-16", "p", "Vought,Seven", "At a Vought press conference Edgar says Stormfront acted alone, blames her for the hearing massacre and puts Compound V's public release on hold. Homelander apologizes to Starlight, and she is reinstated.", "Vought blamed Stormfront for the hearing massacre and reinstated Starlight"],
+     ["2020-10-16", "p", "Church,Seven", "Alastair Adana tells A-Train that Edgar will take him back into the Seven; The Deep is refused, curses Adana and quits the Church.", ""],
+-    ["2020-10-17", "p", "Gov,Boys", "The Boys' charges are dropped, and the White House is creating an Office of Supe Affairs under Congresswoman Victoria Neuman. Secret: Butcher hands Ryan to Grace Mallory, who hides him for the CIA.", "The Boys were cleared; Neuman was named to lead a new Office of Supe Affairs"],
++    ["2020-10-17", "p", "Gov,Boys", "The Boys' charges are dropped, and the White House is creating an Office of Supe Affairs under Congresswoman Victoria Neuman. Secret: Butcher hands Ryan to Grace Mallory, who hides him for the CIA.", "The Boys were cleared; Neuman was named to lead a new Office of Supe Affairs", "!Becca Butcher"],
+     ["2020-10-19", "s", "Church,Gov", "Church of the Collective leader Alastair Adana vanishes; the Church says he has disappeared. Secret: while offering Victoria Neuman dirt on a dozen Supes for tax-exempt status, he had his head burst by her.", "Church of the Collective leader Alastair Adana disappeared"],
+     ["2020-10-19", "p", "Gov,Boys", "Hughie Campbell asks Victoria Neuman at her campaign office to let him fight Vought the legal way; she hires him for the new Office of Supe Affairs. He does not know she just killed Adana.", ""],
+     ["2021-07-07", "p", "Vought", "On VNN's monthly Seven on 7, anchor Cameron Coleman spins for Vought: he backs Homelander, out of sight since the Stormfront affair, and attacks the government's halt to talks on Supes in the military.", "VNN's Cameron Coleman defended Homelander on Seven on 7"],
+@@ -802,7 +815,7 @@
+     ["2025-01-06", "s", "Seven,Vought", "Homelander has Ashley Barrett list Vought staff who could incriminate the Seven, and Firecracker, The Deep and Black Noir II kill them; Ashley, on the list herself, injects Compound V and her head starts to mutate.", ""],
+     ["2025-01-06", "s", "Boys,Gov", "Victoria Neuman is killed. Secret: as she seeks the Boys' protection, Butcher, whose tumor now gives him tentacles, tears her apart, takes the virus and drives off; her daughter Zoe is sent to Red River.", "Vice President-elect Victoria Neuman was killed"],
+     ["2025-01-06", "p", "Gov,Seven", "President-elect Robert Singer is arrested for conspiring to murder Neuman. Secret: Sister Sage framed him with footage taken out of context, the plan she had worked since November.", "President-elect Singer was arrested over Neuman's murder"],
+-    ["2025-01-06", "p", "Gov,Seven,Vought", "Speaker Steven Calhoun becomes President, pledges loyalty to Homelander, declares martial law and deputizes Supes nationwide under him; Homelander blames the Starlighters and vows to hunt them down.", "Calhoun became President and declared martial law"],
++    ["2025-01-06", "p", "Gov,Seven,Vought", "Speaker Steven Calhoun becomes President, pledges loyalty to Homelander, declares martial law and deputizes Supes nationwide under him; Homelander blames the Starlighters and vows to hunt them down.", "Calhoun became President and declared martial law", "!Victoria Neuman"],
+     ["2025-01-06", "s", "Boys,Starlighters,GodU,Gov", "Fleeing New York, the Boys are seized by deputized Supes: Cindy stops Hughie, Love Sausage takes MM, Cate Dunlap mind-controls Frenchie away while Sam Riordan holds Kimiko, who screams her first word. Annie regains her powers and flies off.", "The Boys were arrested as Starlighters; Starlight escaped"],
+     ["2025-01-07", "p", "Seven,Payback,Gov", "President Calhoun takes Homelander to a secret lab where Soldier Boy, his father, lies frozen in a cryo tank.", ""],
+     ["2025-01-07", "p", "Gov,Starlighters,Seven,Vought", "Under martial law Starlighters are branded terrorists and Supe deputies round them up into numbered Freedom Camps in private prisons; VNN becomes state TV and the FBSA is powerless.", "Freedom Camps opened for Starlighters"],
+@@ -1329,7 +1342,8 @@
+   ];
+   // What the public hears: [year, month, the news as it reaches people, words that show a reply delivered it, true for a
+   // canon stop (a time skip can't jump over it), its headline, stricter words that show a reply narrated it, a tag (Jack's
+-  // own stops: "jack"), the day it breaks (a stop lands on that day)]. Only public knowledge: nothing secret is in here.
++  // own stops: "jack"), the day it breaks (a stop lands on that day), and optionally who the headline event depends on
++  // ("Name" alive, "!Name" dead in canon), for branch mode]. Only public knowledge: nothing secret is in here.
+   const NEWS = [
+     [2007, 6, "Vought Studios' first movie, Rising Tide, starring The Deep (still a Godolkin student), is in theaters, and Queen Maeve: Her Majesty comes this summer; Vought is building a movie universe around the Seven.", /Rising Tide|Her Majesty|Vought Studios|(?:Deep|Maeve)[^.]{0,60}(?:movie|film|theaters|premiere)/i, false, "Vought Studios launches its movie universe with Rising Tide", null, null, 15],
+     [2010, 6, "The Deep has graduated from Godolkin and been drafted into the Seven, filling the seventh seat; Vought is rolling him out everywhere.", /(?:The Deep|Deep)[^.]{0,80}(?:drafted|joins?|joined|newest member|seventh seat|graduat)|seventh seat/i, false, "The Deep joins the Seven", null, null, 2],
+@@ -1337,22 +1351,22 @@
+     [2015, 5, "At the Vought Hero Draft, A-Train, top of his class at Godolkin, beat Mister Marathon in a public race and took his seat in the Seven; Homelander refused Marathon a rematch, and Marathon is out.", /(?:A-Train|Marathon)[^.]{0,80}(?:race|draft|seat|beat|replac)|Hero Draft/i, true, "A-Train beats Mister Marathon and takes his seat in the Seven", /(?:A-Train|Marathon)[^.]{0,80}(?:race|beat|replac|took his seat|takes his seat)|Hero Draft/i, null, 31],
+     [2019, 6, "In one week: A-Train ran through and killed a young woman, Robin Ward, in Queens (Vought calls it a tragic accident on a mission); at Vought's shareholders meeting Starlight was introduced as the Seven's newest member, replacing a retiring Lamplighter; Vought says Translucent is away on a classified mission; A-Train beat Shockwave in a televised race; and Transoceanic Flight 37 was hijacked and crashed into the Atlantic with everyone aboard, after which Homelander went on TV demanding that Supes be allowed to serve in the military.", /Robin Ward|Flight 37|Starlight[^.]{0,80}(?:newest|joins?|joined|introduced|shareholders)|Translucent[^.]{0,60}(?:mission|missing|gone)|Shockwave|Supes? in the military/i, true, "Season 1 begins: A-Train kills Robin Ward; Starlight joins the Seven; Translucent 'on a mission'; Flight 37 goes down", /Robin Ward|Flight 37|Starlight[^.]{0,80}(?:newest member|joins the Seven|joined the Seven|introduced)|Translucent[^.]{0,60}classified mission/i, null, 5],
+     [2019, 6, "At the Believe Expo, Starlight said on stage that she was assaulted by a fellow hero; The Deep apologized on television and has gone to Sandusky, Ohio.", /Believe Expo|Sandusky|Deep[^.]{0,60}(?:apolog|Ohio|sabbatical)|Starlight[^.]{0,60}(?:assault|speech|on stage)/i, true, "Believe Expo: Starlight speaks out; The Deep exiled to Ohio", /Believe Expo|Sandusky|Deep[^.]{0,60}(?:apologi[sz]ed|exiled|sabbatical)/i, null, 21],
+-    [2019, 7, "At the end of June, Madelyn Stillwell, Vought's Senior VP of Hero Management, was found killed in her home, and the FBI is hunting a British man, William Butcher, for it; the Pentagon has cleared Supes to serve in the military; Vought has named Ashley Barrett its new Senior VP of Hero Management; the Seven are short two members, with Translucent still \"on a mission\" and The Deep in Ohio; and the news is full of Supe-terrorists abroad, the new reason Supes belong in the military.", /Stillwell[^.]{0,60}(?:dead|died|killed|murder|funeral)|killed in her home|Butcher[^.]{0,60}(?:wanted|fugitive|hunt|suspect)|cleared[^.]{0,40}military|military[^.]{0,40}(?:Supes|cleared)|Ashley Barrett[^.]{0,60}(?:Senior VP|promoted|named|new)|Supe-terrorist/i, true, "Madelyn Stillwell found dead (Butcher blamed); Supes cleared for the military; Ashley Barrett takes her job", /Stillwell[^.]{0,60}(?:dead|died|killed|murder|funeral)|killed in her home|cleared[^.]{0,40}military|Supes? (?:in|for) the military/i, null, 1],
++    [2019, 7, "At the end of June, Madelyn Stillwell, Vought's Senior VP of Hero Management, was found killed in her home, and the FBI is hunting a British man, William Butcher, for it; the Pentagon has cleared Supes to serve in the military; Vought has named Ashley Barrett its new Senior VP of Hero Management; the Seven are short two members, with Translucent still \"on a mission\" and The Deep in Ohio; and the news is full of Supe-terrorists abroad, the new reason Supes belong in the military.", /Stillwell[^.]{0,60}(?:dead|died|killed|murder|funeral)|killed in her home|Butcher[^.]{0,60}(?:wanted|fugitive|hunt|suspect)|cleared[^.]{0,40}military|military[^.]{0,40}(?:Supes|cleared)|Ashley Barrett[^.]{0,60}(?:Senior VP|promoted|named|new)|Supe-terrorist/i, true, "Madelyn Stillwell found dead (Butcher blamed); Supes cleared for the military; Ashley Barrett takes her job", /Stillwell[^.]{0,60}(?:dead|died|killed|murder|funeral)|killed in her home|cleared[^.]{0,40}military|Supes? (?:in|for) the military/i, null, 1, "Homelander"],
+     [2020, 9, "Vought held a public funeral for Translucent, killed, it says, by a Supe-terrorist called El Diablo, and introduced Stormfront as the Seven's newest member; CIA deputy director Susan Raynor died suddenly in Washington.", /Translucent[^.]{0,60}(?:funeral|dead|death|died)|El Diablo|Stormfront[^.]{0,60}(?:join|newest|member|Seven)|Raynor/i, true, "Translucent's funeral; Stormfront joins the Seven", /Translucent[^.]{0,60}(?:funeral|buried)|El Diablo|Stormfront[^.]{0,60}(?:joins?|joined|newest member|takes? (?:his|a) seat)/i, null, 30],
+     [2020, 10, "Compound V is public: a leaked video and documents show Vought makes Supes with a drug (Vought blames rogue scientists, and the military deal is dead); a congressional hearing on Vought ended in a massacre when people's heads exploded on live TV, Jonah Vogelbaum and the hero Shockwave among the dead; Stormfront was exposed as a Nazi born in 1919 and has disappeared; Lamplighter is dead; A-Train is out of the Seven; and Congress created the Federal Bureau of Superhuman Affairs under Congresswoman Victoria Neuman.", /Compound V[^.]{0,80}(?:public|leak|exposed|news|everywhere|out)|hearing[^.]{0,60}(?:head|explod)|heads? explod|Stormfront[^.]{0,60}(?:Nazi|exposed|disappear)|Nazi|Bureau of Superhuman|FBSA|Lamplighter[^.]{0,40}(?:dead|died)|A-Train[^.]{0,40}(?:fired|out of the Seven|dropped)/i, true, "Compound V goes public; the hearing massacre (Vogelbaum dead); Stormfront exposed as a Nazi; the FBSA is born", /hearing[^.]{0,100}(?:heads?|explod|dead|chaos|massacre|Vogelbaum|tragedy)|Vogelbaum[^.]{0,60}(?:dead|died|killed)|Compound V[^.]{0,60}(?:public|leaked|exposed)|Bureau of Superhuman Affairs|FBSA|Stormfront[^.]{0,60}(?:Nazi|exposed)/i, null, 17],
+     [2021, 8, "A-Train is officially back in the Seven.", /A-Train[^.]{0,60}(?:back|rejoin|return)/i, false, "A-Train back in the Seven", null, null, 7],
+     [2022, 5, "Dawn of the Seven premiered at Vought Tower; the FBSA keeps Supes on a shorter leash, with the Boys as its contractors.", /Dawn of the Seven|premiere/i, false, "Dawn of the Seven premieres", null, null, 31],
+-    [2022, 6, "Stormfront killed herself; Homelander snapped on live TV, told the country he was done apologizing, and his numbers went up; The Deep and Supersonic joined the Seven, and Supersonic died days later (Vought says an overdose); an explosion in Midtown killed nineteen; Starlight quit the Seven on a livestream and accused Homelander of covering up a Supe called Soldier Boy; Stan Edgar is out as Vought's CEO after Congresswoman Neuman accused him of crimes; Vought says Queen Maeve died stopping Soldier Boy at Vought Tower; and Homelander killed a protester in the street on camera while his crowd cheered.", /Stormfront[^.]{0,40}(?:dead|died|suicide|killed herself)|done apologizing|Supersonic|Soldier Boy|Midtown[^.]{0,40}(?:explosion|blast|nineteen|19)|Starlight[^.]{0,60}(?:quit|livestream|left the Seven)|Edgar[^.]{0,60}(?:out|ousted|resign|forced)|Maeve[^.]{0,40}(?:dead|died)|protester/i, true, "Season 3: Homelander snaps on TV; Soldier Boy returns; Starlight quits; Edgar out; Maeve 'dead'", /done apologizing|Supersonic|Soldier Boy[^.]{0,80}(?:back|returns?|alive|blast|Midtown)|Starlight[^.]{0,60}(?:quit|livestream|left the Seven)|Edgar[^.]{0,60}(?:ousted|forced out|out as CEO|removed)|Maeve[^.]{0,40}(?:dead|died)/i, null, 16],
++    [2022, 6, "Stormfront killed herself; Homelander snapped on live TV, told the country he was done apologizing, and his numbers went up; The Deep and Supersonic joined the Seven, and Supersonic died days later (Vought says an overdose); an explosion in Midtown killed nineteen; Starlight quit the Seven on a livestream and accused Homelander of covering up a Supe called Soldier Boy; Stan Edgar is out as Vought's CEO after Congresswoman Neuman accused him of crimes; Vought says Queen Maeve died stopping Soldier Boy at Vought Tower; and Homelander killed a protester in the street on camera while his crowd cheered.", /Stormfront[^.]{0,40}(?:dead|died|suicide|killed herself)|done apologizing|Supersonic|Soldier Boy|Midtown[^.]{0,40}(?:explosion|blast|nineteen|19)|Starlight[^.]{0,60}(?:quit|livestream|left the Seven)|Edgar[^.]{0,60}(?:out|ousted|resign|forced)|Maeve[^.]{0,40}(?:dead|died)|protester/i, true, "Season 3: Homelander snaps on TV; Soldier Boy returns; Starlight quits; Edgar out; Maeve 'dead'", /done apologizing|Supersonic|Soldier Boy[^.]{0,80}(?:back|returns?|alive|blast|Midtown)|Starlight[^.]{0,60}(?:quit|livestream|left the Seven)|Edgar[^.]{0,60}(?:ousted|forced out|out as CEO|removed)|Maeve[^.]{0,40}(?:dead|died)/i, null, 16, "Homelander"],
+     [2023, 8, "At Godolkin University the top-ranked student, Golden Boy, killed Professor Brinkerhoff and then himself; Vought calls it a drug-fueled breakdown.", /Golden Boy|Brinkerhoff[^.]{0,40}(?:dead|died|killed|burn)/i, true, "Golden Boy kills Professor Brinkerhoff at Godolkin", /Golden Boy[^.]{0,80}(?:kill|burn|dead|died)|Brinkerhoff[^.]{0,40}(?:dead|died|killed|burn)/i, null, 30],
+     [2023, 9, "A massacre at Godolkin University: Vought says escaped lab subjects attacked the campus, Homelander arrived and arrested four students as the instigators, and two others, Cate Dunlap and Sam Riordan, are being hailed as the Guardians of Godolkin.", /Godolkin[^.]{0,80}(?:massacre|attack|killed|dead)|Guardians of Godolkin|Cate Dunlap|Sam Riordan/i, true, "The Godolkin massacre; the Guardians of Godolkin", /Godolkin[^.]{0,80}(?:massacre|attack|killed|dead)|Guardians of Godolkin/i, null, 22],
+     [2024, 10, "Homelander is on trial for murder in New York, with his Hometeamers and Starlight's Starlighters facing off outside the courthouse, while Robert Singer and Victoria Neuman lead the presidential race in its last weeks.", /trial|courthouse|Starlighters|Hometeamers|(?:Singer|Neuman)[^.]{0,60}(?:campaign|election|poll|race)/i, false, "Homelander on trial; Singer and Neuman lead the election", null, null, 1],
+-    [2024, 11, "Robert Singer won the presidency with Victoria Neuman as Vice President; Homelander was acquitted; Sister Sage and Firecracker joined the Seven; three of Homelander's fans were beaten to death and Starlighters are blamed; VNN anchor Cameron Coleman and the hero Tek Knight are dead.", /(?:Singer|Neuman)[^.]{0,60}(?:won|elected|President|Vice)|acquitted|Sister Sage|Firecracker|Cameron Coleman|Tek Knight/i, true, "Singer elected; Homelander acquitted; Sister Sage and Firecracker join the Seven", /(?:Singer|Neuman)[^.]{0,60}(?:elected|won the|President-elect|Vice President-elect)|Homelander[^.]{0,40}acquitted|Sister Sage[^.]{0,60}(?:joins?|joined|newest)|Firecracker[^.]{0,60}(?:joins?|joined|newest)/i, null, 12],
++    [2024, 11, "Robert Singer won the presidency with Victoria Neuman as Vice President; Homelander was acquitted; Sister Sage and Firecracker joined the Seven; three of Homelander's fans were beaten to death and Starlighters are blamed; VNN anchor Cameron Coleman and the hero Tek Knight are dead.", /(?:Singer|Neuman)[^.]{0,60}(?:won|elected|President|Vice)|acquitted|Sister Sage|Firecracker|Cameron Coleman|Tek Knight/i, true, "Singer elected; Homelander acquitted; Sister Sage and Firecracker join the Seven", /(?:Singer|Neuman)[^.]{0,60}(?:elected|won the|President-elect|Vice President-elect)|Homelander[^.]{0,40}acquitted|Sister Sage[^.]{0,60}(?:joins?|joined|newest)|Firecracker[^.]{0,60}(?:joins?|joined|newest)/i, null, 12, "Homelander"],
+     [2024, 12, "A-Train has vanished from the Seven; Vought says he is on a secret mission overseas.", /A-Train[^.]{0,80}(?:vanish|gone|missing|secret mission|overseas|left)/i, false, "A-Train vanishes ('secret mission')", null, null, 26],
+-    [2025, 1, "Homelander outed Vice President-elect Victoria Neuman as a Supe on live TV; she is dead and President-elect Singer is under arrest for it; House Speaker Steven Calhoun is President and has declared martial law, with Homelander's Supes deputized nationwide; the Boys and Starlight are wanted; Freedom Camps are opening for Starlighters.", /Neuman[^.]{0,80}(?:Supe|dead|died|killed|outed)|Calhoun|martial law|Freedom Camp|deputized|Singer[^.]{0,60}arrest/i, true, "Neuman outed and killed; Calhoun's martial law; Supes deputized", /Neuman[^.]{0,80}(?:Supe|dead|died|killed|outed)|Calhoun|martial law|Freedom Camp|deputized/i, null, 6],
++    [2025, 1, "Homelander outed Vice President-elect Victoria Neuman as a Supe on live TV; she is dead and President-elect Singer is under arrest for it; House Speaker Steven Calhoun is President and has declared martial law, with Homelander's Supes deputized nationwide; the Boys and Starlight are wanted; Freedom Camps are opening for Starlighters.", /Neuman[^.]{0,80}(?:Supe|dead|died|killed|outed)|Calhoun|martial law|Freedom Camp|deputized|Singer[^.]{0,60}arrest/i, true, "Neuman outed and killed; Calhoun's martial law; Supes deputized", /Neuman[^.]{0,80}(?:Supe|dead|died|killed|outed)|Calhoun|martial law|Freedom Camp|deputized/i, null, 6, "Homelander,Victoria Neuman"],
+     [2025, 10, "Sister Sage is Vought's new CEO; at Godolkin University, founder Thomas Godolkin turned out to be alive and was killed by the student Marie Moreau.", /Sister Sage[^.]{0,40}CEO|Thomas Godolkin|Dean Cipher|Marie Moreau/i, true, "Sister Sage is Vought's CEO; Thomas Godolkin killed at God U", /Sister Sage[^.]{0,40}CEO|Thomas Godolkin|Dean Cipher/i, null, 6],
+-    [2026, 2, "At Vought's shareholders meeting, Starlighters leaked video of Homelander abandoning Flight 37, which Vice President Ashley Barrett called AI; a Freedom Camp was broken open; A-Train is dead and Vought blames Starlight; and Soldier Boy, thawed and pardoned, was presented by Homelander as his father and the Seven's number two.", /Flight 37|Freedom Camp|A-Train[^.]{0,40}(?:dead|died|killed)|Soldier Boy|shareholders/i, true, "Flight 37 video leaks; A-Train dead; Soldier Boy joins the Seven as Homelander's father", /Flight 37[^.]{0,60}(?:video|leak|footage)|A-Train[^.]{0,40}(?:dead|died|killed)|Soldier Boy[^.]{0,80}(?:father|number two|pardon|thaw)/i, null, 15],
+-    [2026, 3, "Homelander has been proclaimed Prophet of the Democratic Church of America; Firecracker and Mister Marathon are dead; a Vought oil pipeline burst in the Bering Sea, and Black Noir is said to have died there.", /Prophet|Church of America|Firecracker[^.]{0,40}(?:dead|died|killed)|Marathon[^.]{0,40}(?:dead|died|killed)|pipeline|Noir[^.]{0,40}(?:dead|died|killed)/i, true, "Homelander proclaimed Prophet; Firecracker, Marathon and Noir dead; the pipeline bursts", /Prophet|Church of America|Firecracker[^.]{0,40}(?:dead|died|killed)|Marathon[^.]{0,40}(?:dead|died|killed)|pipeline[^.]{0,40}(?:burst|rupture)/i, null, 16],
+-    [2026, 4, "President Calhoun is dead and Ashley Barrett is President; the Seven has been abolished; on Easter Sunday Homelander declared himself God live from the White House and was killed on air by William Butcher with a crowbar; Butcher died the next day; Barrett was impeached and arrested, Robert Singer is President again, and Stan Edgar is back as Vought's CEO.", /Calhoun|crowbar|Easter|White House|Butcher[^.]{0,60}(?:killed|dead|died)|Homelander[^.]{0,60}(?:dead|died|killed)|impeach|Singer[^.]{0,40}President|Edgar[^.]{0,40}(?:CEO|back)/i, true, "Homelander declares himself God and is killed on live TV; the Seven is gone", /crowbar|Easter[^.]{0,80}(?:God|White House)|Homelander[^.]{0,60}(?:dead|died|killed)|Butcher[^.]{0,60}(?:killed Homelander|dead|died)|impeach|Seven[^.]{0,40}abolish/i, null, 6]
++    [2026, 2, "At Vought's shareholders meeting, Starlighters leaked video of Homelander abandoning Flight 37, which Vice President Ashley Barrett called AI; a Freedom Camp was broken open; A-Train is dead and Vought blames Starlight; and Soldier Boy, thawed and pardoned, was presented by Homelander as his father and the Seven's number two.", /Flight 37|Freedom Camp|A-Train[^.]{0,40}(?:dead|died|killed)|Soldier Boy|shareholders/i, true, "Flight 37 video leaks; A-Train dead; Soldier Boy joins the Seven as Homelander's father", /Flight 37[^.]{0,60}(?:video|leak|footage)|A-Train[^.]{0,40}(?:dead|died|killed)|Soldier Boy[^.]{0,80}(?:father|number two|pardon|thaw)/i, null, 15, "Homelander"],
++    [2026, 3, "Homelander has been proclaimed Prophet of the Democratic Church of America; Firecracker and Mister Marathon are dead; a Vought oil pipeline burst in the Bering Sea, and Black Noir is said to have died there.", /Prophet|Church of America|Firecracker[^.]{0,40}(?:dead|died|killed)|Marathon[^.]{0,40}(?:dead|died|killed)|pipeline|Noir[^.]{0,40}(?:dead|died|killed)/i, true, "Homelander proclaimed Prophet; Firecracker, Marathon and Noir dead; the pipeline bursts", /Prophet|Church of America|Firecracker[^.]{0,40}(?:dead|died|killed)|Marathon[^.]{0,40}(?:dead|died|killed)|pipeline[^.]{0,40}(?:burst|rupture)/i, null, 16, "Homelander"],
++    [2026, 4, "President Calhoun is dead and Ashley Barrett is President; the Seven has been abolished; on Easter Sunday Homelander declared himself God live from the White House and was killed on air by William Butcher with a crowbar; Butcher died the next day; Barrett was impeached and arrested, Robert Singer is President again, and Stan Edgar is back as Vought's CEO.", /Calhoun|crowbar|Easter|White House|Butcher[^.]{0,60}(?:killed|dead|died)|Homelander[^.]{0,60}(?:dead|died|killed)|impeach|Singer[^.]{0,40}President|Edgar[^.]{0,40}(?:CEO|back)/i, true, "Homelander declares himself God and is killed on live TV; the Seven is gone", /crowbar|Easter[^.]{0,80}(?:God|White House)|Homelander[^.]{0,60}(?:dead|died|killed)|Butcher[^.]{0,60}(?:killed Homelander|dead|died)|impeach|Seven[^.]{0,40}abolish/i, null, 6, "Homelander,Billy Butcher"]
+   ];
+   // Jack's own stops, shaped like NEWS entries but never public news (none at the moment)
+   const BEATS = [];
+@@ -1362,8 +1376,11 @@
+   // The day a piece of news breaks, and the day a canon stop lands on (the 1st of its month when a row has no day)
+   const stopDayOf = (n) => DY(n[0], n[1], typeof n[8] === "number" ? n[8] : 1);
+   const newsDay = stopDayOf;
++  // The news as the story stands (branch mode: without the clauses about someone the story changed), and whether any is left
++  const newsText = (n) => (isBeat(n) ? n[2] : branching() && needsBroken(n[9], newsDay(n)) ? "" : cleanse(n[2], newsIdx(n), newsDay(n)));
++  const newsLive = (n) => !!newsText(n);
+   // The days a time skip stops at, in order, within (from, to] (day numbers): the big canon days (and any stop of Jack's own)
+-  const stopsBetween = (from, to) => NEWS.concat(isJack() ? BEATS : []).filter((n) => n[4] && stopDayOf(n) > from && stopDayOf(n) <= to)
++  const stopsBetween = (from, to) => NEWS.concat(isJack() ? BEATS : []).filter((n) => n[4] && newsLive(n) && stopDayOf(n) > from && stopDayOf(n) <= to)
+     .sort((a, b) => stopDayOf(a) - stopDayOf(b));
+   // Where a skip starts looking for stops: today, or while the day is only a guess (a story from v3.1, which stopped at
+   // whole months) the end of the month, so a canon stop of the month the story is already in isn't played a second time
+@@ -1383,10 +1400,10 @@
+   // The oldest piece of public news of the past year that the player character hasn't heard yet (n: today's day number)
+   const dueNews = (n) => {
+     migrateTold();
+-    const due = NEWS.filter((x) => { const d = newsDay(x); return d <= n && n - d <= 365 && !T.told[newsKey(x)]; });
++    const due = NEWS.filter((x) => { const d = newsDay(x); return d <= n && n - d <= 365 && !T.told[newsKey(x)] && newsLive(x); });
+     return due.length ? due[0] : null;   // oldest first, so a catch-up after a skip reads in order
+   };
+-  const newsBefore = (n, days) => NEWS.filter((x) => { const d = newsDay(x); return d <= n && n - d <= days; });
++  const newsBefore = (n, days) => NEWS.filter((x) => { const d = newsDay(x); return d <= n && n - d <= days && newsLive(x); });
+   // News older than a year is the world's background, not a beat to play; after a skip of more than six weeks
+   // (from: the day the turn started), so is news more than a month old: the skip's landing already covered it
+   const settleOldNews = (n, from) => {
+@@ -1485,7 +1502,7 @@
+     return out;
+   };
+   const addChange = (n, k, at, extra) => {
+-    T.changes.push(Object.assign({ n, k, at, turn: count === null ? -1 : count }, extra || {}));
++    T.changes.push(Object.assign({ n, k, at, d: today(), turn: count === null ? -1 : count }, extra || {}));
+     if (T.changes.length > C.maxChanges) T.changes = T.changes.slice(-C.maxChanges);
+   };
+   // When someone died, as the story stands: { at, story } (story: the story killed them, not canon), or null if alive
+@@ -1496,6 +1513,54 @@
+     return canonLast ? { at: canonLast, story: false } : null;
+   };
+   const deadAt = (d, i) => !!d && (d.story ? i >= d.at : i > d.at);
++  // ---------- canon mode (v3.3) ----------
++  // "strict": canon happens on its day whatever the story did; a line naming someone the story changed is kept, tagged.
++  // "branch": the story's changes branch the world. A canon event, agenda line, news clause or card line that depends on
++  // someone the story killed early (or saved from a canon death) is dropped, its day is no longer a skip stop and its
++  // news is never delivered; the note's "Changed in this story" lines say what happened instead. State lines (the Seven,
++  // Vought, the world) are kept and tagged in both modes. Everything the player never touched happens on schedule.
++  const canonMode = () => (T.canon === "strict" || T.canon === "branch" ? T.canon : (C.canonMode === "strict" ? "strict" : "branch"));
++  const branching = () => canonMode() === "branch";
++  // The day someone dies in canon (from DEAD), or null
++  const canonDeathDay = (name) => { const d = DEAD.find((x) => deadName(x) === name); return d ? d[0] : null; };
++  // The story's changes that `text` depends on: the changed people it names, when the change is in force on day n
++  // (or in month `at` when n is null): a story death at or before then, or a survival of a canon death at or before then
++  const offScript = (text, at, n) => {
++    const out = [];
++    if (!text || !T.changes.length) return out;
++    for (const c of latestChanges()) {
++      if (c.canon || (c.k !== "dead" && c.k !== "alive")) continue;
++      const p = trackedByName(c.n);
++      if (!p || !p[1].test(text)) continue;
++      if (c.k === "dead") { if (typeof n === "number" && typeof c.d === "number" ? c.d <= n : c.at <= at) out.push(c); }
++      else if (p[2]) { const dd = canonDeathDay(c.n); if (typeof n === "number" && dd !== null ? n >= dd : at >= p[2]) out.push(c); }
++    }
++    return out;
++  };
++  // A canon row's own dependencies (its optional 6th element): "Name" must be alive in the story on day n, "!Name" must
++  // be dead (canon's death stood). Broken when the story killed the first early or saved the second.
++  const needsBroken = (needs, n) => {
++    if (!needs) return false;
++    for (const tok of needs.split(",")) {
++      const t = tok.trim();
++      if (!t) continue;
++      const dead = t.charAt(0) === "!", name = dead ? t.slice(1).trim() : t;
++      const c = changeOf(name);
++      if (!c || c.canon || (c.k !== "dead" && c.k !== "alive")) continue;
++      if (!dead && c.k === "dead" && (typeof c.d === "number" ? c.d <= n : c.at <= fromDayNo(n).i)) return true;
++      if (dead && c.k === "alive") return true;
++    }
++    return false;
++  };
++  // Branch mode: a line made of clauses ("; " apart) loses the clauses that name someone the story changed; "" when
++  // nothing is left. A month label in front ("June 2019 ") stays. Strict mode: the line as it is.
++  const cleanse = (text, at, n) => {
++    if (!branching() || !text || !offScript(text, at, n).length) return text;
++    const m = new RegExp("^((?:" + MONTHS.join("|") + ") \\d{4} )").exec(text);
++    const body = m ? text.slice(m[1].length) : text;
++    const parts = body.split(/;\s+/).filter((p) => !offScript(p, at, n).length);
++    return parts.length ? (m ? m[1] : "") + parts.join("; ") : "";
++  };
+   // A retried or undone turn starts over: forget what an earlier attempt at it (or an undone later turn) recorded
+   const rollbackTurn = () => {
+     if (count === null) return;
+@@ -1576,7 +1641,11 @@
+     return MONTHS[monthOf(x.i) - 1] + " " + x.d + (typeof ref === "number" && yearOf(fromDayNo(ref).i) === yearOf(x.i) ? "" : ", " + yearOf(x.i));
+   };
+   // A beat in full or as its short line, tagged when the story changed someone in it
+-  const beatLine = (k, full) => tagChanged(full ? CANON[k][3] : CANON[k][4], fromDayNo(canonDays[k]).i, OFF_SCRIPT);
++  const beatLine = (k, full) => {
++    const i = fromDayNo(canonDays[k]).i;
++    if (branching() && (offScript(CANON[k][3], i, canonDays[k]).length || needsBroken(CANON[k][5], canonDays[k]))) return "";
++    return tagChanged(full ? CANON[k][3] : CANON[k][4], i, OFF_SCRIPT);
++  };
+   const beatsIn = (a, b) => { const out = []; for (let k = 0; k < CANON.length; k++) if (canonDays[k] >= a && canonDays[k] <= b) out.push(k); return out; };
+   // Canon on day n and in the week before it: today's in full; the past week in full, newest first, while it fits in
+   // about `room` characters, the rest as short lines; then short lines for the rest of the past month, and one line
+@@ -1587,8 +1656,8 @@
+     if (todays.length) {
+       // in full while they fit in about 700 characters (a dense day lists the rest by their short lines)
+       let room = compact ? 400 : 600;
+-      const lines = todays.map((k) => { const full = beatLine(k, true); if (full.length <= room) { room -= full.length; return full; } return CANON[k][4] ? beatLine(k, false).replace(/[.\s]*$/, ".") : ""; }).filter(Boolean);
+-      out.push("Canon today: " + lines.join(" "));
++      const lines = todays.map((k) => { const full = beatLine(k, true); if (!full) return ""; if (full.length <= room) { room -= full.length; return full; } return CANON[k][4] ? beatLine(k, false).replace(/[.\s]*$/, ".") : ""; }).filter(Boolean);
++      if (lines.length) out.push("Canon today: " + lines.join(" "));
+     }
+     const week = beatsIn(n - 6, n - 1);
+     if (week.length) {
+@@ -1596,16 +1665,17 @@
+       const lines = [];
+       for (let j = week.length - 1; j >= 0; j--) {
+         const k = week[j], full = beatLine(k, true);
++        if (!full) continue;
+         if (full.length <= room) { room -= full.length; lines.unshift(dayLabel(canonDays[k], n) + ": " + full); }
+         else if (CANON[k][4]) lines.unshift(dayLabel(canonDays[k], n) + ": " + beatLine(k, false));
+       }
+       if (lines.length) out.push("Canon this past week: " + lines.map((x) => x.replace(/[.\s]*$/, ".")).join(" "));
+     }
+     // a busy day leaves out the older lines
+-    if (!compact && (todays.length ? out[0].length : 0) <= 400) {
+-      const month = beatsIn(n - 30, n - 7).filter((k) => CANON[k][4]).slice(-3).map((k) => dayLabel(canonDays[k], n) + ": " + beatLine(k, false));
++    if (!compact && (out.length && todays.length ? out[0].length : 0) <= 400) {
++      const month = beatsIn(n - 30, n - 7).filter((k) => CANON[k][4] && beatLine(k, false)).slice(-3).map((k) => dayLabel(canonDays[k], n) + ": " + beatLine(k, false));
+       const i = fromDayNo(n).i;
+-      const older = SUMMARY.filter((r) => { const x = D(r[0], r[1]); return i - x >= 2 && i - x <= 12; }).slice(-2).map((r) => tagChanged(r[2], D(r[0], r[1]), OFF_SCRIPT));
++      const older = SUMMARY.filter((r) => { const x = D(r[0], r[1]); return i - x >= 2 && i - x <= 12 && cleanse(r[2], x, null); }).slice(-2).map((r) => tagChanged(cleanse(r[2], D(r[0], r[1]), null), D(r[0], r[1]), OFF_SCRIPT));
+       const earlier = older.concat(month);
+       if (earlier.length) out.push("Earlier: " + earlier.join("; "));
+     }
+@@ -1621,9 +1691,10 @@
+       if (d <= from || d > to || !CANON[k][4]) continue;
+       const i = fromDayNo(d).i;
+       if (i > fi && i < ti && SUMMARY.some((r) => D(r[0], r[1]) === i)) continue;   // a whole month in the middle: its summary line
+-      out.push([d, dayLabel(d) + ": " + beatLine(k, false)]);
++      const line = beatLine(k, false);
++      if (line) out.push([d, dayLabel(d) + ": " + line]);
+     }
+-    for (const r of SUMMARY) { const i = D(r[0], r[1]); if (i > fi && i < ti) out.push([DY(r[0], r[1], 1), tagChanged(r[2], i, OFF_SCRIPT)]); }
++    for (const r of SUMMARY) { const i = D(r[0], r[1]); const line = i > fi && i < ti ? cleanse(r[2], i, null) : ""; if (line) out.push([DY(r[0], r[1], 1), tagChanged(line, i, OFF_SCRIPT)]); }
+     return out.sort((a, b) => a[0] - b[0]).map((x) => x[1]).slice(-12);
+   };
+   // ---------- canon groups: what they are doing right now ----------
+@@ -1655,7 +1726,11 @@
+     // one group, or two when one of them is the player character's own
+     return own.concat(seen.map((x) => x[0]).filter((g) => !own.includes(g))).filter((g) => agendaOn(g, n)).slice(0, own.length ? 2 : 1);
+   };
+-  const groupLines = (recent, n) => groupsNear(recent, n).map((g) => GROUP_NAMES[g] + ": " + tagChanged(agendaOn(g, n), fromDayNo(n).i, OFF_SCRIPT).replace(/[.\s]*$/, "."));
++  const groupLines = (recent, n) => groupsNear(recent, n).map((g) => {
++    const a = agendaOn(g, n);
++    if (branching() && offScript(a, fromDayNo(n).i, n).length) return "";   // the group's plans hinge on someone the story changed
++    return GROUP_NAMES[g] + ": " + tagChanged(a, fromDayNo(n).i, OFF_SCRIPT).replace(/[.\s]*$/, ".");
++  }).filter(Boolean);
+ 
+   // ---------- status note ----------
+   const STATUS_TAG = "[Status (for the narrator, not story text):";
+@@ -1674,7 +1749,7 @@
+     const fromNo = dayNo(t.base, t.baseDay), toNo = dayNo(t.start, t.startDay);
+     // A canon stop by its full date ("canon lands on May 20, 2019"), and what to open on there
+     const stopWhere = (n, upper) => (isBeat(n) ? "Jack's 18th birthday is on " : (upper ? "Canon" : "canon") + " lands on ") + fmtNo(stopDayOf(n));
+-    const stopBody = (n) => (isBeat(n) ? n[2] : tagChanged(n[2], newsIdx(n), OFF_SCRIPT) + pull);
++    const stopBody = (n) => (isBeat(n) ? n[2] : tagChanged(newsText(n), newsIdx(n), OFF_SCRIPT) + pull);
+     // What lies ahead of an open-ended skip that can reach month `reach`
+     // (reachNo: the furthest day it can reach)
+     const aheadText = (reachNo) => {
+@@ -1783,7 +1858,7 @@
+     const fixes = minimal ? [] : fixesNow();
+     if (fixes.length) s += " CORRECTIONS (mistakes in recent replies; the story treats them as never written): " + fixes.join(" ");
+     if (news) {
+-      s += " NEWS (work it into this reply, or the first calm beat, the way a screen, feed, paper or talk would bring it, in a few sentences, public side only; the player character reacts only as the player directs): " + tagChanged(news[2], newsIdx(news), OFF_SCRIPT);
++      s += " NEWS (work it into this reply, or the first calm beat, the way a screen, feed, paper or talk would bring it, in a few sentences, public side only; the player character reacts only as the player directs): " + tagChanged(newsText(news), newsIdx(news), OFF_SCRIPT);
+     }
+     if (isJack() && a >= 18 && !tiny) s += " Jack's lines: dark, deadpan jokes.";
+     return s + (hint || "") + "]";
+@@ -2124,7 +2199,7 @@
+       if (at < run.length && SCHED_DATE.test(run.slice(at, at + 60))) starts.push(at);
+     }
+     const items = starts.map((a, k) => run.slice(a, k + 1 < starts.length ? starts[k + 1] : run.length));
+-    const kept = items.filter((it) => { const x = schedDay(it); return x === null || x <= i; });
++    const kept = items.filter((it) => { const x = schedDay(it); return (x === null || x <= i) && !(branching() && x !== null && offScript(it, fromDayNo(x).i, x).length); });
+     return kept.length === items.length ? run : kept.join("").replace(/\s+$/, "");
+   };
+   // Everything above "Recent Story:" (Plot Essentials, story cards); the story itself is never touched
+@@ -2310,7 +2385,7 @@
+           const nv = ls.findIndex((l) => /^Never:/.test(l));
+           const cut = first >= 0 ? first : nv >= 0 ? nv : ls.length;
+           const rest = first >= 0 ? ls.slice(last + 1) : nv >= 0 ? ls.slice(nv) : [];
+-          e = ls.slice(0, cut).concat(CARD_LINES[keys].filter((x) => x[0] <= i).map((x) => x[1]), rest).join("\n");
++          e = ls.slice(0, cut).concat(CARD_LINES[keys].filter((x) => x[0] <= i && !(branching() && offScript(keys + ": " + x[1], fromDayNo(x[0]).i, x[0]).length)).map((x) => x[1]), rest).join("\n");
+         }
+         // a "Canon schedule:" run: only the items whose date has come
+         const items = C.cardHistory && has(CARD_SCHED) ? CARD_SCHED[keys] : null, at = e.indexOf("Canon schedule:");
+@@ -2319,7 +2394,7 @@
+           const end = at >= 0 ? e.indexOf("Never:", at) : -1;
+           const run = at >= 0 ? e.slice(at + 15, end >= 0 ? end : e.length).trim() : "";
+           const bare = at >= 0 ? (e.slice(0, at).replace(/\s+$/, "") + (end >= 0 ? " " + e.slice(end) : "")).trim() : e;
+-          const past = items ? items.filter((x) => x[0] <= i).map((x) => x[1]).join(" ") : dropFutureItems(run, i);
++          const past = items ? items.filter((x) => x[0] <= i && !(branching() && offScript(keys + ": " + x[1], fromDayNo(x[0]).i, x[0]).length)).map((x) => x[1]).join(" ") : dropFutureItems(run, i);
+           const nv = bare.lastIndexOf("Never:");
+           const sched = past ? "Canon schedule: " + past : "";
+           e = nv >= 0 ? [bare.slice(0, nv).replace(/\s+$/, ""), sched, bare.slice(nv)].filter(Boolean).join(" ") : [bare, sched].filter(Boolean).join(" ");
+@@ -2590,9 +2665,12 @@
+     while ((m = reDateArrives.exec(s))) offer(dateIdx(m[1], m[3], 1), m.index);
+     // A big canon event told in the reply puts the story at least in its month, on or after its day (open-ended turns only)
+     if (canonCounts) {
++      // v3.3: a reply can tell the next canon stop's news, never anything past it ("A-Train killed Robin Ward" is not 2026)
++      const next = stopsBetween(stopFrom(), 1e9)[0];
++      const limit = next ? stopDayOf(next) : Infinity;
+       for (const n of NEWS) {
+         const x = newsIdx(n);
+-        if (n[6] && x > from && n[6].test(s)) offer(x, s.search(n[6]), fromDayNo(stopDayOf(n)).d);
++        if (n[6] && newsLive(n) && x > from && stopDayOf(n) <= limit && n[6].test(s)) offer(x, s.search(n[6]), fromDayNo(stopDayOf(n)).d);
+       }
+     }
+     const b = curBirth();
+@@ -2920,7 +2998,7 @@
+ 
+   // ---------- commands ----------
+   // A command starts its line. AI Dungeon may put "> You " or "> You say " in front of it.
+-  const CMD_HEAD = "[ \\t]*(?:>[ \\t]*)?(?:You[ \\t]+(?:say[ \\t]+)?)?[\"“]?[ \\t]*\\/(date|skip|facts?|forget|private|status|news|changes|dead|alive)\\b";
++  const CMD_HEAD = "[ \\t]*(?:>[ \\t]*)?(?:You[ \\t]+(?:say[ \\t]+)?)?[\"“]?[ \\t]*\\/(date|skip|facts?|forget|private|status|news|changes|dead|alive|canon)\\b";
+   const reCommand = new RegExp("^" + CMD_HEAD + "([^\\n]*)", "im");
+   const reCommandLine = new RegExp("^" + CMD_HEAD + ".*$\\n?", "gim");
+ 
+@@ -2999,14 +3077,21 @@
+           addChange(p[0], name, T.idx);
+           reply = p[0] + " is " + name + " in this story from now on.";
+         }
++      } else if (name === "canon") {
++        if (/^strict$/i.test(arg)) T.canon = "strict";
++        else if (/^branch(?:ing)?$/i.test(arg)) T.canon = "branch";
++        reply = "Canon mode: " + canonMode() + ". " + (branching()
++          ? "Your story's changes branch the world: canon that depends on someone you killed or saved is dropped, and the rest still happens on schedule. /canon strict makes canon happen regardless."
++          : "Canon happens on its day whatever your story did; lines about someone you changed are tagged. /canon branch lets your changes branch the world.") +
++          (arg && !/^(?:strict|branch(?:ing)?)$/i.test(arg) ? " (Try: /canon strict or /canon branch.)" : "");
+       } else if (name === "status") {
+         const level = !T.max || T.max >= C.compactBelowChars ? 0 : T.max >= C.minimalBelowChars ? 1 : 2;
+         reply = "Tracker v" + TRACKER_VERSION + ". It's " + nowText() + "." + (isJack() ? " Jack is " + ageAt(T.idx) + "." : charAge(T.idx) !== null ? " " + charName() + " is " + charAge(T.idx) + "." : " Custom character.") +
+           " The AI gets the " + ["full", "short", "minimal"][level] + " note" + (T.max ? " (its context holds about " + commas(T.max) + " characters)" : "") +
+-          ". Facts: " + T.facts.length + ". Story changes: " + changeLines(T.idx).length + ". Private details: " + (T.private ? "on" : "off") + ".";
++          ". Facts: " + T.facts.length + ". Story changes: " + changeLines(T.idx).length + ". Canon: " + canonMode() + ". Private details: " + (T.private ? "on" : "off") + ".";
+       } else if (name === "news") {
+         const recent = newsBefore(today(), 365);
+-        reply = recent.length ? "Public canon news of the past year: " + recent.map((n) => fmtNo(newsDay(n)) + ": " + n[2]).join("  ")
++        reply = recent.length ? "Public canon news of the past year: " + recent.map((n) => fmtNo(newsDay(n)) + ": " + newsText(n)).join("  ")
+           : "No public canon news in the past year (" + fmt(T.idx) + ").";
+       } else if (name === "private") {
+         if (/^on$/i.test(arg)) T.private = true;
+@@ -3355,7 +3440,7 @@
+     const delivered = [];
+     for (const n of NEWS) {
+       const k = newsKey(n), x = newsDay(n);
+-      if (!T.told[k] && x <= today() && today() - x <= 365 && (n[3].test(out) || (n[6] && n[6].test(out)))) { T.told[k] = true; delivered.push(n); }
++      if (!T.told[k] && newsLive(n) && x <= today() && today() - x <= 365 && (n[3].test(out) || (n[6] && n[6].test(out)))) { T.told[k] = true; delivered.push(n); }
+     }
+     if (typeof T.pendingDay === "number" && today() >= T.pendingDay) T.pendingDay = null;
+     if (T.newsDue && !T.told[T.newsDue]) {

@@ -1,0 +1,49 @@
+V3.3 - BRANCHING CANON (sandbox mode)
+
+What it is
+  Canon is the default future, not a promise. When your story kills someone early, or saves someone canon kills,
+  every canon event, agenda line, news clause and story-card line that depends on them is dropped, its day stops
+  being a skip stop, and its news is never delivered. The note's "Changed in this story" lines tell the AI what
+  happened instead. Everything you never touched still happens on schedule. State lines (the Seven, Vought, the
+  world) are kept and tagged "(In this story X is dead/alive)" so the AI sees the contradiction and plays around it.
+
+  Also fixed: a reply's canon words can no longer move the date past the next canon stop. In v3.2, "On the news:
+  A-Train killed a young woman, Robin Ward" on June 5, 2019 jumped the clock to February 2026.
+
+Commands
+  /canon           shows the mode (branch is the default for every adventure, old ones included)
+  /canon strict    canon happens on its day whatever your story did (the v3.2 behavior)
+  /canon branch    back to branching
+  /status          now shows the mode too
+
+How "depends on" is decided
+  1. By name: a line that names someone the story changed, on or after the day of the change, is off-script.
+  2. By an optional dependency on the row itself, for events whose cause the text doesn't name:
+       CANON rows: a 6th element, e.g. "!Madelyn Stillwell" (her canon death must stand) or "Homelander" (alive).
+       NEWS rows: a 10th element, same format. Seven items carry one (July 2019, June 2022, Nov 2024, Jan 2025,
+       Feb/Mar/Apr 2026 all need Homelander; Jan 2025 and Apr 2026 also need Neuman / Butcher).
+     Three CANON rows carry one so far (Ashley's promotion, Ryan going to Mallory, Calhoun's presidency). Add more
+     where you know a chain: it's data, not code.
+
+Known limits (by design, cheap to live with)
+  - A news item is dropped by clause ("; " apart). A clause with a pronoun pointing at a dropped one can read oddly
+    ("the FBI is hunting William Butcher for it" after Stillwell's clause is gone).
+  - A line that merely mentions a changed person is dropped too (the Godolkin massacre news goes when Homelander is
+    dead, because he arrests the students in it). Quieter beats contradictory.
+  - The "needs" lists are judgment calls. Rows without one rely on names alone.
+
+Install
+  Paste "7 Script - Library v3.3.js" into Scripts > Library on your PRIVATE copy. Nothing else changes
+  (AI Instructions, Plot Essentials, Author's Note, cards and the three hook scripts are the v3.2 ones).
+
+Tests (from this folder, with node)
+  node tests/tests-branch.js "7 Script - Library v3.3.js" "<v3.2 Library>" "<4 Plot Essentials.txt>" "<6 Story Cards.json>" tests/harness.js
+  The v3.2 tests-lite and fuzz-lite also run against it unchanged.
+
+Results
+  tests-lite 69/69. tests-branch 35/35. fuzz-lite seed 12345: 2 notes over 10,000 chars in 4,800 turns (v3.2 had 1;
+  same cause, a busy full-tier day, not the branching), seed 777: 0 failures. Hooks under 80 ms.
+  Context: with nothing changed the note is byte-identical to v3.2. After three changes (Homelander killed 2010,
+  A-Train killed 2016, Stillwell saved 2019) the note is smaller in branch than strict on every date tested, by
+  257 to 2,154 chars (average -1,120), because dropped lines cost nothing. The persistent "Changed in this story"
+  lines are the only ongoing cost: about 40-80 chars per change, as in v3.2.
